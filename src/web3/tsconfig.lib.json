@@ -1,0 +1,14 @@
+{
+  "extends": "../tsconfig.lib.base.json",
+  "compilerOptions": {
+    "declaration": true,
+    "outDir": "../../dist/libs/auth/web3",
+    "types": ["node"],
+    "typeRoots": ["../../node_modules/@types"],
+    // "paths": {
+    //   "@hsuite/*": ["*"]
+    // }
+  },
+  "include": ["src/**/*"],
+  "exclude": ["node_modules", "dist", "test", "**/*spec.ts"]
+}
