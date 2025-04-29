@@ -156,6 +156,7 @@ export class AuthModule {
                   jwt: <JwtModuleOptions> factory.commonOptions.jwt,
                   operator: <IHashgraph.IOperator> factory.commonOptions.operator,
                   passport: <IAuth.IConfiguration.IPassportStrategy> factory.commonOptions.passport,
+                  appName: <string> factory.commonOptions.appName,
                   tokenGateOptions: <IAuth.IConfiguration.IWeb3.ITokenGate.IOptions> factory.web3Options.tokenGateOptions
                 }
               }
@@ -223,17 +224,37 @@ export class AuthModule {
   configure(consumer: MiddlewareConsumer) {
     if (this.redis != null) {
       const RedisStore = require("connect-redis").default;
-      let store = new RedisStore({ client: <any>this.redis.client, logErrors: true });
+      let store = new RedisStore({ 
+        client: <any>this.redis.client, 
+        logErrors: true,
+        // Set prefix to ensure session isolation
+        prefix: 'hsuite-sess:',
+        // Enable session disabling for logout/regeneration
+        disableTouch: false,
+        // Handle session expiration
+        ttl: 86400 // 1 day in seconds (adjust as needed)
+      });
+
+      const crypto = require('crypto');
+      
       consumer
         .apply(
           session({
             store: store,
             secret: process.env.SESSION_SECRET,
             resave: false,
-            saveUninitialized: true,
+            saveUninitialized: true, // Keep as true for auth to work properly
             proxy: true,
-            name: this.redis.appName,
             cookie: this.redis.cookieOptions,
+            name: this.redis.appName, // This will be "SmartRegistry" based on your config
+            // Generate unique session IDs
+            genid: (req) => {
+              // Use a simpler approach that won't cause auth issues
+              const timestamp = Date.now();
+              const randomBytes = crypto.randomBytes(16).toString('hex');
+              
+              return `sid_${timestamp}_${randomBytes}`;
+            }
           }),
           passport.initialize(),
           passport.session(),

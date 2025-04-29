@@ -45,8 +45,8 @@ export class SessionSerializer extends PassportSerializer {
    * 2. Processes it for session storage (if needed)
    * 3. Passes the serialized data to the callback
    * 
-   * The current implementation passes the user object as-is,
-   * but can be customized for specific serialization needs.
+   * The implementation now includes unique session identifiers to ensure
+   * multiple login sessions can be maintained for the same user.
    * 
    * @example
    * ```typescript
@@ -62,7 +62,26 @@ export class SessionSerializer extends PassportSerializer {
    * ```
    */
   serializeUser(user: any, done: (err: Error | null, user: any) => void): void {
-    done(null, user)
+    // Create a unique login session identifier
+    const sessionData = {
+      ...user,
+      // Add required unique identifiers to distinguish between sessions
+      _sessionTimestamp: user._sessionTimestamp || Date.now(),
+      _sessionId: user.uniqueSessionId || user._sessionId || `sess_${Date.now()}_${require('crypto').randomBytes(8).toString('hex')}`,
+      // Keep track of which wallet account owns this session
+      _walletId: user.walletId || user.session?.walletId || user.operator?.accountId
+    };
+    
+    // Handle session isolation by adding a unique signature
+    if (user.signedData?.userSignature && !sessionData._loginSignature) {
+      // Create a hash of the signature to identify this specific login
+      const crypto = require('crypto');
+      sessionData._loginSignature = crypto.createHash('sha256')
+        .update(JSON.stringify(user.signedData.userSignature))
+        .digest('hex');
+    }
+    
+    done(null, sessionData);
   }
   
   /**
@@ -77,8 +96,8 @@ export class SessionSerializer extends PassportSerializer {
    * 2. Processes it back into a user object (if needed)
    * 3. Passes the deserialized user to the callback
    * 
-   * The current implementation returns the payload as-is,
-   * but can be customized for specific deserialization needs.
+   * The current implementation preserves the unique session identifiers
+   * and session timestamps used to differentiate between multiple logins.
    * 
    * @example
    * ```typescript
@@ -95,6 +114,13 @@ export class SessionSerializer extends PassportSerializer {
     payload: any,
     done: (err: Error | null, payload: any) => void
   ): void {
-    done(null, payload)
+    // Preserve all session identifiers during deserialization
+    const userData = {
+      ...payload,
+      // Ensure session isolation markers are preserved
+      _isAuthenticated: true
+    };
+    
+    done(null, userData);
   }
 }

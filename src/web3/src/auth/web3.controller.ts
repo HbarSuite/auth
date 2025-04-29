@@ -152,6 +152,79 @@ export class AuthWeb3Controller {
             expires:  moment().add(this.authWeb3Options.jwt.signOptions.expiresIn, 'hour').toDate()
           }
         );
+      } 
+      // Handle Redis session strategy
+      else if (this.authWeb3Options.passport == IAuth.IConfiguration.IPassportStrategy.REDIS) {
+        // Create a unique name for this session's cookie, using wallet ID and timestamp
+        const shortWalletId = authLogin.session.walletId.substring(0, 6).replace(/\./g, '_');
+        const timestampHash = require('crypto').createHash('md5').update(Date.now().toString()).digest('hex').substring(0, 8);
+        const cookieSuffix = `_${shortWalletId}_${timestampHash}`;
+        const baseAppName = this.authWeb3Options.appName || 'SmartRegistry';
+        const uniqueCookieName = `${baseAppName}${cookieSuffix}`;
+        
+        // Create a unique session ID with cryptographic security
+        const crypto = require('crypto');
+        const uniqueSessionId = `sid_${Date.now()}_${crypto.randomBytes(16).toString('hex')}`;
+        
+        // SECURE IMPLEMENTATION: Create a new session directly in Redis without regenerate()
+        // This preserves existing sessions while creating a new isolated session
+        const sessionData = {
+          passport: {
+            user: {
+              ...authLogin,
+              _sessionTimestamp: Date.now(),
+              _walletId: authLogin.session.walletId,
+              _uniqueSessionId: uniqueSessionId,
+              cookieName: uniqueCookieName,
+              // Add cryptographic session binding for security
+              _sessionSignature: crypto.createHmac('sha256', 'hsuite-secure-session-salt')
+                                      .update(`${authLogin.session.walletId}:${uniqueSessionId}`)
+                                      .digest('hex')
+            }
+          },
+          // Add wallet info at the root level for easy identification
+          walletId: authLogin.session.walletId,
+          uniqueSessionId: uniqueSessionId,
+          cookieName: uniqueCookieName,
+          // Add session isolation and validation data
+          cookie: {
+            originalMaxAge: this.authWeb3Options.cookieOptions?.maxAge || (60000 * 60 * 24),
+            expires: new Date(Date.now() + (this.authWeb3Options.cookieOptions?.maxAge || (60000 * 60 * 24))),
+            secure: !!this.authWeb3Options.cookieOptions?.secure,
+            httpOnly: true
+          }
+        };
+        
+        // Create a new session in Redis directly
+        await new Promise<void>((resolve, reject) => {
+          request.sessionStore.set(uniqueSessionId, sessionData, (err) => {
+            if (err) {
+              console.error('Error creating session in Redis:', err);
+              reject(err);
+              return;
+            }
+            resolve();
+          });
+        });
+        
+        // Set the cookie with the session ID
+        response.cookie(uniqueCookieName, uniqueSessionId, {
+          path: '/',
+          httpOnly: true,
+          secure: !!this.authWeb3Options.cookieOptions?.secure,
+          sameSite: this.authWeb3Options.cookieOptions?.sameSite || 'lax',
+          maxAge: this.authWeb3Options.cookieOptions?.maxAge || (60000 * 60 * 24) // 1 day default
+        });
+        
+        // Add the unique cookie name to the login response so frontend can use it
+        (authLogin as any).cookieName = uniqueCookieName;
+        // Add session management information
+        (authLogin as any).sessionManagement = {
+          cookieName: uniqueCookieName,
+          walletId: authLogin.session.walletId,
+          sessionId: uniqueSessionId,
+          instructions: "To use this session specifically, include 'x-session-cookie' header with the value of 'cookieName' in your requests"
+        };
       }
   
       return authLogin;
@@ -202,21 +275,53 @@ export class AuthWeb3Controller {
           'accessToken', 
           null,
           {
-            expires:  moment().toDate()
+            expires: moment().toDate()
           }
         );
       } 
       // Handle session-based logout
       else {
-        request.session.destroy();
+        // Get all cookies
+        const cookies = request.cookies || {};
         
-        response.cookie(
-          'connect.sid', 
-          null,
-          {
-            expires:  moment().toDate()
-          }
+        // Find all session cookies matching our pattern
+        const sessionCookieNames = Object.keys(cookies).filter(name => 
+          name.startsWith(this.authWeb3Options.appName) || name === 'connect.sid'
         );
+        
+        // Default cookie to clear if we can't find any better option
+        let cookieToClear = this.authWeb3Options.appName || 'connect.sid';
+        
+        // If we have a specific cookie name in the session, use that
+        if (request.session && request.session.cookieName) {
+          cookieToClear = request.session.cookieName;
+        }
+        
+        // Properly destroy the session to ensure clean logout
+        await new Promise<void>((resolve, reject) => {
+          // First save any necessary data before destroying
+          const sessionData = { ...request.session };
+          
+          request.session.destroy((err) => {
+            if (err) {
+              console.error('Session destruction error:', err);
+              reject(err);
+              return;
+            }
+            
+            // Clear all session cookies that match our pattern
+            sessionCookieNames.forEach(cookieName => {
+              response.clearCookie(cookieName, {
+                path: '/',
+                httpOnly: true,
+                secure: this.authWeb3Options.cookieOptions?.secure || false,
+                sameSite: this.authWeb3Options.cookieOptions?.sameSite || 'lax'
+              });
+            });
+            
+            resolve();
+          });
+        });
       }
   
       return {

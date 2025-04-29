@@ -13,6 +13,9 @@ import { IS_PUBLIC, IAuth } from '@hsuite/auth-types'
  * - Managing authentication state
  * - Validating authentication results
  * 
+ * This guard is primarily used for initial login authentication.
+ * After login, the RedisAuthGuard handles subsequent request authentication.
+ * 
  * @example
  * ```typescript
  * // Apply guard to controller or route
@@ -63,14 +66,16 @@ export class Web3AuthGuard extends AuthGuard('web3') {
       return true;
     }
 
+    // Get the request
+    const request = context.switchToHttp().getRequest();
+
     // Handle Redis session-based authentication
-    if(
-      this.authWeb3Options.passport == IAuth.IConfiguration.IPassportStrategy.REDIS
-    ) {
+    if(this.authWeb3Options.passport == IAuth.IConfiguration.IPassportStrategy.REDIS) {
+      // For login operations, use the standard passport authentication
       const result = (await super.canActivate(context)) as boolean;
-      const request = context.switchToHttp().getRequest();
-  
-      await super.logIn(request);
+      if (result) {
+        await super.logIn(request);
+      }
       return result;
     } 
     // Handle JWT authentication

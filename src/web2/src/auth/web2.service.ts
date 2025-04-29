@@ -1,12 +1,12 @@
 import { IAuth, Auth } from '@hsuite/auth-types'
 import { UserDocument, UsersService } from '@hsuite/users'
 import { User } from '@hsuite/users-types'
-import { Inject, Injectable, Logger, UnauthorizedException } from '@nestjs/common'
+import { Inject, Injectable, UnauthorizedException } from '@nestjs/common'
 import { MailerService } from '@nestjs-modules/mailer'
 import * as bcrypt from 'bcrypt'
 import * as moment from 'moment'
 import * as lodash from 'lodash'
-import { ObjectId } from 'mongoose'
+import { LoggerHelper } from '@hsuite/helpers/logger.helper'
 
 /**
  * Service responsible for handling authentication-related operations for Web2 users.
@@ -26,8 +26,11 @@ import { ObjectId } from 'mongoose'
  */
 @Injectable()
 export class AuthWeb2Service {
-    /** Logger instance for the service */
-    protected logger: Logger = new Logger(AuthWeb2Service.name);
+    /**
+     * Logger instance for the service
+     * @type {LoggerHelper}
+     */
+    protected logger: LoggerHelper = new LoggerHelper(AuthWeb2Service.name);
 
     /**
      * Creates an instance of AuthWeb2Service.
