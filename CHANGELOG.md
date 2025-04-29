@@ -20,3 +20,7 @@ All notable changes to this project will be documented in this file.
 - Modified: src/web2/src/auth/web2.service.ts
 - Modified: src/web3/src/auth/web3.controller.ts
 - Modified: src/web3/src/guards/web3.guard.ts
+
+## [2.0.1] - 2025-04-29
+
+- Modified: package.json
