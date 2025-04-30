@@ -1,6 +1,6 @@
 {
     "name": "@hsuite/auth",
-    "version": "2.1.0",
+    "version": "2.1.1",
     "main": "index.js",
     "types": "index.d.ts",
     "isPublic": true,
@@ -18,9 +18,9 @@
         "@hsuite/ipfs": "^2.0.0",
         "@hsuite/mirrors": "^2.0.0",
         "@hsuite/users-types": "^2.0.0",
-        "@hsuite/hashgraph-types": "^2.0.1",
+        "@hsuite/hashgraph-types": "^2.0.0",
         "@hsuite/smart-network-types": "^2.0.0",
-        "@hsuite/smart-config": "^2.0.0",
+        "@hsuite/smart-config": "^2.1.0",
         "@hsuite/nestjs-swagger": "^1.0.3",
         "@hsuite/subscriptions-types": "^2.0.0"
     },
